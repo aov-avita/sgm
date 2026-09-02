@@ -8,6 +8,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Librería externa de Cloudinary para el Upload Widget -->
+<script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript"></script>
 <style>
   :root{
     --bg:#121417;
@@ -238,7 +240,48 @@
   td.na{color:var(--text-faint);}
   .dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:7px;}
 
-  footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:30px;font-family:'IBM Plex Mono',monospace;}
+  /* Estilos adicionales para el nuevo Footer y Botón */
+  .site-footer {
+    text-align: center;
+    color: var(--text-faint);
+    font-size: 11px;
+    margin-top: 30px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .footer-links {
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .galeria-link {
+    color: #38bdf8;
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .galeria-link:hover {
+    text-decoration: underline;
+  }
+  .btn-upload-segma {
+    background-color: #0284c7;
+    color: #ffffff;
+    border: none;
+    padding: 5px 12px;
+    font-size: 11px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 500;
+    border-radius: 4px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background-color 0.2s ease;
+  }
+  .btn-upload-segma:hover {
+    background-color: #0369a1;
+  }
 
   @media (max-width:880px){
     .kpi-row{grid-template-columns:1fr;}
@@ -301,11 +344,17 @@
     </table>
   </div>
 
-  <footer>
-    <div style="margin-bottom: 8px;">
-      📸 <a href="https://aov-avita.github.io/sgm/fotos.html" target="_blank" rel="noopener noreferrer" style="color: #38bdf8; text-decoration: none; font-weight: 500;">Ver Galería de Fotos del Proyecto</a>
+  <footer class="site-footer">
+    <div class="footer-links">
+      <span>📸 <a href="https://aov-avita.github.io/sgm/fotos.html" target="_blank" rel="noopener noreferrer" class="galeria-link">Ver Galería de Fotos del Proyecto</a></span>
+      <span class="admin-sep">·</span>
+      <button id="upload_widget" class="btn-upload-segma">
+        📷 Subir fotos de terreno
+      </button>
     </div>
+
     Dashboard de avance de obra · Avances acumulados, no parciales
+
     <div class="admin-bar">
       <input type="file" id="fileInput" accept=".xlsx,.xls">
       <button class="admin-link" id="uploadBtn">vista previa local</button>
@@ -317,6 +366,49 @@
 </div>
 
 <script>
+/* ============ Configuración del Widget de Cloudinary ============ */
+const cloudName = "gc52w8os";
+const uploadPreset = "SEGMA_preset";
+
+const myWidget = cloudinary.createUploadWidget({
+    cloudName: cloudName,
+    uploadPreset: uploadPreset,
+    sources: ['local', 'camera'], 
+    multiple: true,
+    folder: 'segma',
+    tags: ['segma'],
+    language: 'es',
+    text: {
+      es: {
+        or: "o",
+        back: "Atrás",
+        close: "Cerrar",
+        menu: {
+          files: "Mis archivos",
+          camera: "Cámara del celular"
+        },
+        local: {
+          browse: "Buscar fotos",
+          dd_title: "Arrastra y suelta fotos aquí"
+        }
+      }
+    }
+  }, (error, result) => {
+    if (!error && result && result.event === "success") {
+      console.log('Imagen subida con éxito: ', result.info);
+      const statusSpan = document.getElementById('uploadStatus');
+      if (statusSpan) {
+        statusSpan.className = "upload-status ok";
+        statusSpan.innerText = "¡Foto subida con éxito a Cloudinary!";
+      }
+    }
+  }
+);
+
+document.getElementById("upload_widget").addEventListener("click", function(){
+    myWidget.open();
+  }, false);
+
 /* ============ datos originales embebidos (avanceSEGMA.xlsx) ============ */
 const SEED_RAW = [
   { fecha:"2026-07-06", enfierradura:28.333333, moldaje:null,  hormigon:null },
