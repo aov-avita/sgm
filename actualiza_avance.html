@@ -2,83 +2,75 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Actualizar avanceSEGMA.xlsx</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Actualizador SEGMA</title>
 
 <style>
 body{
-    font-family: Arial, sans-serif;
-    background:#f4f4f4;
+    font-family:Arial,sans-serif;
+    background:#f5f5f5;
+    margin:0;
     padding:40px;
 }
 
-.card{
-    max-width:600px;
+.container{
+    max-width:500px;
     margin:auto;
-    background:white;
+    background:#fff;
     padding:30px;
     border-radius:10px;
-    box-shadow:0 0 10px rgba(0,0,0,0.1);
-    text-align:center;
+    box-shadow:0 0 10px rgba(0,0,0,.15);
 }
 
 h2{
-    margin-bottom:20px;
-}
-
-input[type=file]{
-    margin:20px 0;
+    text-align:center;
 }
 
 button{
-    background:#238636;
+    background:#198754;
     color:white;
     border:none;
-    padding:12px 20px;
+    width:100%;
+    padding:12px;
+    font-size:16px;
     border-radius:6px;
     cursor:pointer;
-    margin:5px;
+    margin-top:10px;
 }
 
 button:hover{
-    background:#2ea043;
+    background:#157347;
 }
 
-.status{
+input[type=file]{
+    width:100%;
+    margin-top:20px;
+}
+
+#estado{
     margin-top:20px;
     font-weight:bold;
 }
-
-.success{
-    color:green;
-}
-
-.error{
-    color:red;
-}
 </style>
+
 </head>
 <body>
 
-<div class="card">
+<div class="container">
 
 <h2>Actualizar avanceSEGMA.xlsx</h2>
 
-<p id="tokenStatus"></p>
+<input type="file" id="archivo" accept=".xlsx">
 
-<input type="file" id="fileInput" accept=".xlsx">
-
-<br>
-
-<button onclick="subirArchivo()">
+<button id="btnSubir">
 Actualizar GitHub
 </button>
 
-<button onclick="cambiarToken()">
+<button id="btnToken">
 Cambiar Token
 </button>
 
-<div id="status" class="status"></div>
+<div id="estado"></div>
 
 </div>
 
@@ -89,61 +81,61 @@ const REPO = "sgm";
 const BRANCH = "main";
 const FILE_PATH = "avanceSEGMA.xlsx";
 
-let TOKEN = localStorage.getItem("github_token");
+let token = localStorage.getItem("github_token");
 
-if (!TOKEN) {
+async function pedirToken(){
 
-    TOKEN = prompt("Ingrese su Token GitHub:");
+    const nuevoToken = prompt(
+        "Ingrese su Token GitHub:"
+    );
 
-    if (TOKEN) {
-        localStorage.setItem("github_token", TOKEN);
+    if(nuevoToken){
+
+        localStorage.setItem(
+            "github_token",
+            nuevoToken.trim()
+        );
+
+        token = nuevoToken.trim();
+
+        mostrarEstado(
+            "✅ Token guardado",
+            "green"
+        );
     }
-
 }
 
-actualizarEstadoToken();
-
-function actualizarEstadoToken(){
-
-    document.getElementById("tokenStatus").innerHTML =
-        TOKEN
-        ? "✅ Token GitHub cargado"
-        : "❌ No hay token configurado";
-
+if(!token){
+    pedirToken();
 }
 
-function cambiarToken(){
+function mostrarEstado(texto,color){
 
-    const nuevo = prompt("Ingrese el nuevo Token GitHub:");
+    const e =
+        document.getElementById("estado");
 
-    if(nuevo){
-
-        TOKEN = nuevo;
-        localStorage.setItem("github_token", nuevo);
-
-        actualizarEstadoToken();
-
-        alert("Token actualizado correctamente.");
-
-    }
-
+    e.innerHTML = texto;
+    e.style.color = color;
 }
 
-function convertirBase64(file){
+function fileToBase64(file){
 
     return new Promise((resolve,reject)=>{
 
         const reader = new FileReader();
 
-        reader.readAsDataURL(file);
-
         reader.onload = () => {
 
-            resolve(reader.result.split(',')[1]);
+            const base64 =
+                reader.result.split(",")[1];
+
+            resolve(base64);
 
         };
 
-        reader.onerror = error => reject(error);
+        reader.onerror = reject;
+
+        reader.readAsDataURL(file);
 
     });
 
@@ -151,76 +143,131 @@ function convertirBase64(file){
 
 async function subirArchivo(){
 
-    const status = document.getElementById("status");
-
-    const file = document.getElementById("fileInput").files[0];
-
-    if(!TOKEN){
-
-        status.innerHTML =
-            "<span class='error'>❌ No hay token configurado.</span>";
-
-        return;
-
-    }
-
-    if(!file){
-
-        status.innerHTML =
-            "<span class='error'>❌ Seleccione un archivo Excel.</span>";
-
-        return;
-
-    }
-
-    if(!file.name.toLowerCase().endsWith(".xlsx")){
-
-        status.innerHTML =
-            "<span class='error'>❌ Sólo se permiten archivos .xlsx</span>";
-
-        return;
-
-    }
-
-    status.innerHTML = "⏳ Convirtiendo archivo...";
-
     try{
 
-        const contenidoBase64 = await convertirBase64(file);
+        if(!token){
 
-        status.innerHTML = "⏳ Obteniendo SHA actual...";
+            mostrarEstado(
+                "❌ No existe token",
+                "red"
+            );
 
-        const archivoActual = await fetch(
-            `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`,
-            {
-                headers:{
-                    "Authorization":`Bearer ${TOKEN}`,
-                    "Accept":"application/vnd.github+json"
-                }
-            }
+            return;
+        }
+
+        const archivo =
+            document.getElementById("archivo")
+            .files[0];
+
+        if(!archivo){
+
+            mostrarEstado(
+                "❌ Seleccione un archivo",
+                "red"
+            );
+
+            return;
+        }
+
+        mostrarEstado(
+            "⏳ Procesando...",
+            "orange"
         );
 
-        if(!archivoActual.ok){
+        const contenido =
+            await fileToBase64(archivo);
 
-            const err = await archivoActual.text();
-            throw new Error(err);
+        const respuestaSHA =
+            await fetch(
+                `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`,
+                {
+                    headers:{
+                        Authorization:
+                        `Bearer ${token}`
+                    }
+                }
+            );
+
+        if(!respuestaSHA.ok){
+
+            throw new Error(
+                "No fue posible leer el archivo actual."
+            );
 
         }
 
-        const dataActual = await archivoActual.json();
+        const archivoActual =
+            await respuestaSHA.json();
 
-        status.innerHTML = "⏳ Actualizando repositorio...";
+        const sha = archivoActual.sha;
 
-        const respuesta = await fetch(
-            `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`,
-            {
-                method:"PUT",
-                headers:{
-                    "Authorization":`Bearer ${TOKEN}`,
-                    "Accept":"application/vnd.github+json",
-                    "Content-Type":"application/json"
-                },
-                body:JSON.stringify({
-                    message:`Actualización automática avanceSEGMA.xlsx ${new Date().toLocaleString()}`,
-                    content:contenidoBase64,
-                    sha:dataActual.sha,
+        const respuestaUpdate =
+            await fetch(
+                `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`,
+                {
+                    method:"PUT",
+                    headers:{
+                        Authorization:
+                        `Bearer ${token}`,
+                        "Content-Type":
+                        "application/json"
+                    },
+                    body:JSON.stringify({
+                        message:
+                        "Actualizacion avanceSEGMA.xlsx",
+                        content:
+                        contenido,
+                        sha:
+                        sha,
+                        branch:
+                        BRANCH
+                    })
+                }
+            );
+
+        if(!respuestaUpdate.ok){
+
+            const error =
+                await respuestaUpdate.text();
+
+            throw new Error(error);
+
+        }
+
+        mostrarEstado(
+            "✅ Archivo actualizado correctamente",
+            "green"
+        );
+
+    }
+    catch(error){
+
+        console.error(error);
+
+        mostrarEstado(
+            "❌ " + error.message,
+            "red"
+        );
+
+    }
+
+}
+
+document
+.getElementById("btnSubir")
+.addEventListener(
+    "click",
+    subirArchivo
+);
+
+document
+.getElementById("btnToken")
+.addEventListener(
+    "click",
+    pedirToken
+);
+
+</script>
+
+</body>
+</html>
