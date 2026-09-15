@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Actualizar avanceSEGMA.xlsx</title>
+
+<style>
+body{
+    font-family: Arial, sans-serif;
+    max-width: 600px;
+    margin: 50px auto;
+    padding: 20px;
+    text-align:center;
+}
+
+.card{
+    border:1px solid #ddd;
+    border-radius:10px;
+    padding:25px;
+}
+
+button{
+    background:#238636;
+    color:white;
+    border:none;
+    padding:12px 25px;
+    cursor:pointer;
+    border-radius:6px;
+    font-size:16px;
+}
+
+button:hover{
+    background:#2ea043;
+}
+
+#status{
+    margin-top:20px;
+    font-weight:bold;
+}
+</style>
+
+</head>
+<body>
+
+<div class="card">
+
+<h2>Actualizar avanceSEGMA.xlsx</h2>
+
+<input type="file" id="fileInput" accept=".xlsx">
+
+<br><br>
+
+<button onclick="subirArchivo()">
+Actualizar GitHub
+</button>
+
+<div id="status"></div>
+
+</div>
+
+<script>
+
+const TOKEN = "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";
+const OWNER = "aov-avita";
+const REPO = "sgm";
+const BRANCH = "main";
+const FILE_PATH = "avanceSEGMA.xlsx";
+
+async function subirArchivo() {
+
+    const file = document.getElementById('fileInput').files[0];
+
+    if(!file){
+        alert("Seleccione un archivo Excel.");
+        return;
+    }
+
+    document.getElementById("status").innerHTML =
+        "Obteniendo información del archivo...";
+
+    const contenidoBase64 = await convertirBase64(file);
+
+    try{
+
+        const archivoActual = await fetch(
+            `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`,
+            {
+                headers:{
+                    Authorization:`Bearer ${TOKEN}`
+                }
+            }
+        );
+
+        const dataActual = await archivoActual.json();
+
+        const respuesta = await fetch(
+            `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`,
+            {
+                method:"PUT",
+                headers:{
+                    "Authorization":`Bearer ${TOKEN}`,
+                    "Content-Type":"application/json"
+                },
+                body:JSON.stringify({
+                    message:`Actualización automática ${new Date().toLocaleString()}`,
+                    content:contenidoBase64,
+                    sha:dataActual.sha,
+                    branch:BRANCH
+                })
+            }
+        );
+
+        if(respuesta.ok){
+
+            document.getElementById("status").innerHTML =
+                "✅ Archivo actualizado correctamente.";
+
+        }else{
+
+            const error = await respuesta.text();
+
+            document.getElementById("status").innerHTML =
+                "❌ Error:<br>" + error;
+
+        }
+
+    }catch(err){
+
+        document.getElementById("status").innerHTML =
+            "❌ " + err.message;
+
+    }
+
+}
+
+function convertirBase64(file){
+
+    return new Promise((resolve,reject)=>{
+
+        const reader = new FileReader();
+
+        reader.readAsDataURL(file);
+
+        reader.onload = () => {
+
+            const base64 =
+                reader.result.split(',')[1];
+
+            resolve(base64);
+
+        };
+
+        reader.onerror = reject;
+
+    });
+
+}
+
+</script>
+
+</body>
+</html>
