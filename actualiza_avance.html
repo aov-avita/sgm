@@ -8,38 +8,55 @@
 <style>
 body{
     font-family: Arial, sans-serif;
-    max-width: 600px;
-    margin: 50px auto;
-    padding: 20px;
-    text-align:center;
+    background:#f4f4f4;
+    padding:40px;
 }
 
 .card{
-    border:1px solid #ddd;
+    max-width:600px;
+    margin:auto;
+    background:white;
+    padding:30px;
     border-radius:10px;
-    padding:25px;
+    box-shadow:0 0 10px rgba(0,0,0,0.1);
+    text-align:center;
+}
+
+h2{
+    margin-bottom:20px;
+}
+
+input[type=file]{
+    margin:20px 0;
 }
 
 button{
     background:#238636;
     color:white;
     border:none;
-    padding:12px 25px;
-    cursor:pointer;
+    padding:12px 20px;
     border-radius:6px;
-    font-size:16px;
+    cursor:pointer;
+    margin:5px;
 }
 
 button:hover{
     background:#2ea043;
 }
 
-#status{
+.status{
     margin-top:20px;
     font-weight:bold;
 }
-</style>
 
+.success{
+    color:green;
+}
+
+.error{
+    color:red;
+}
+</style>
 </head>
 <body>
 
@@ -47,88 +64,66 @@ button:hover{
 
 <h2>Actualizar avanceSEGMA.xlsx</h2>
 
+<p id="tokenStatus"></p>
+
 <input type="file" id="fileInput" accept=".xlsx">
 
-<br><br>
+<br>
 
 <button onclick="subirArchivo()">
 Actualizar GitHub
 </button>
 
-<div id="status"></div>
+<button onclick="cambiarToken()">
+Cambiar Token
+</button>
+
+<div id="status" class="status"></div>
 
 </div>
 
 <script>
 
-const TOKEN = "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";
 const OWNER = "aov-avita";
 const REPO = "sgm";
 const BRANCH = "main";
 const FILE_PATH = "avanceSEGMA.xlsx";
 
-async function subirArchivo() {
+let TOKEN = localStorage.getItem("github_token");
 
-    const file = document.getElementById('fileInput').files[0];
+if (!TOKEN) {
 
-    if(!file){
-        alert("Seleccione un archivo Excel.");
-        return;
+    TOKEN = prompt("Ingrese su Token GitHub:");
+
+    if (TOKEN) {
+        localStorage.setItem("github_token", TOKEN);
     }
 
-    document.getElementById("status").innerHTML =
-        "Obteniendo información del archivo...";
+}
 
-    const contenidoBase64 = await convertirBase64(file);
+actualizarEstadoToken();
 
-    try{
+function actualizarEstadoToken(){
 
-        const archivoActual = await fetch(
-            `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`,
-            {
-                headers:{
-                    Authorization:`Bearer ${TOKEN}`
-                }
-            }
-        );
+    document.getElementById("tokenStatus").innerHTML =
+        TOKEN
+        ? "✅ Token GitHub cargado"
+        : "❌ No hay token configurado";
 
-        const dataActual = await archivoActual.json();
+}
 
-        const respuesta = await fetch(
-            `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`,
-            {
-                method:"PUT",
-                headers:{
-                    "Authorization":`Bearer ${TOKEN}`,
-                    "Content-Type":"application/json"
-                },
-                body:JSON.stringify({
-                    message:`Actualización automática ${new Date().toLocaleString()}`,
-                    content:contenidoBase64,
-                    sha:dataActual.sha,
-                    branch:BRANCH
-                })
-            }
-        );
+function cambiarToken(){
 
-        if(respuesta.ok){
+    const nuevo = prompt("Ingrese el nuevo Token GitHub:");
 
-            document.getElementById("status").innerHTML =
-                "✅ Archivo actualizado correctamente.";
+    if(nuevo){
 
-        }else{
+        TOKEN = nuevo;
+        localStorage.setItem("github_token", nuevo);
 
-            const error = await respuesta.text();
+        actualizarEstadoToken();
 
-            document.getElementById("status").innerHTML =
-                "❌ Error:<br>" + error;
-
-        }
-
-    }catch(err){
-
-        document.getElementById("status").innerHTML =
-            "❌ " + err.message;
+        alert("Token actualizado correctamente.");
 
     }
 
@@ -144,20 +139,88 @@ function convertirBase64(file){
 
         reader.onload = () => {
 
-            const base64 =
-                reader.result.split(',')[1];
-
-            resolve(base64);
+            resolve(reader.result.split(',')[1]);
 
         };
 
-        reader.onerror = reject;
+        reader.onerror = error => reject(error);
 
     });
 
 }
 
-</script>
+async function subirArchivo(){
 
-</body>
-</html>
+    const status = document.getElementById("status");
+
+    const file = document.getElementById("fileInput").files[0];
+
+    if(!TOKEN){
+
+        status.innerHTML =
+            "<span class='error'>❌ No hay token configurado.</span>";
+
+        return;
+
+    }
+
+    if(!file){
+
+        status.innerHTML =
+            "<span class='error'>❌ Seleccione un archivo Excel.</span>";
+
+        return;
+
+    }
+
+    if(!file.name.toLowerCase().endsWith(".xlsx")){
+
+        status.innerHTML =
+            "<span class='error'>❌ Sólo se permiten archivos .xlsx</span>";
+
+        return;
+
+    }
+
+    status.innerHTML = "⏳ Convirtiendo archivo...";
+
+    try{
+
+        const contenidoBase64 = await convertirBase64(file);
+
+        status.innerHTML = "⏳ Obteniendo SHA actual...";
+
+        const archivoActual = await fetch(
+            `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`,
+            {
+                headers:{
+                    "Authorization":`Bearer ${TOKEN}`,
+                    "Accept":"application/vnd.github+json"
+                }
+            }
+        );
+
+        if(!archivoActual.ok){
+
+            const err = await archivoActual.text();
+            throw new Error(err);
+
+        }
+
+        const dataActual = await archivoActual.json();
+
+        status.innerHTML = "⏳ Actualizando repositorio...";
+
+        const respuesta = await fetch(
+            `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`,
+            {
+                method:"PUT",
+                headers:{
+                    "Authorization":`Bearer ${TOKEN}`,
+                    "Accept":"application/vnd.github+json",
+                    "Content-Type":"application/json"
+                },
+                body:JSON.stringify({
+                    message:`Actualización automática avanceSEGMA.xlsx ${new Date().toLocaleString()}`,
+                    content:contenidoBase64,
+                    sha:dataActual.sha,
